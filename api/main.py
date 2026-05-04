@@ -12,6 +12,7 @@ import mlflow.xgboost
 import psycopg2
 import psycopg2.extras
 import shap
+import xgboost as xgb
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -22,6 +23,7 @@ from extractors.text_features import extract_text_features
 
 MLFLOW_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MODEL_NAME = "malicious-package-detector"
+MODEL_FILE = Path(__file__).parent / "model" / "champion.json"
 
 FEATURES = [
     "entropy_max", "has_network_in_install", "has_credential_access",
@@ -46,8 +48,17 @@ _explainer = None
 
 def _load_model():
     global _model, _explainer
-    mlflow.set_tracking_uri(MLFLOW_URI)
-    _model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}@champion")
+    # Load from bundled file first (works out of the box after git clone)
+    if MODEL_FILE.exists():
+        from xgboost import XGBClassifier
+        _model = XGBClassifier()
+        _model.load_model(str(MODEL_FILE))
+        print(f"[api] model loaded from {MODEL_FILE}")
+    else:
+        # Fall back to MLflow (after retraining a new champion)
+        mlflow.set_tracking_uri(MLFLOW_URI)
+        _model = mlflow.xgboost.load_model(f"models:/{MODEL_NAME}@champion")
+        print("[api] model loaded from MLflow")
     _explainer = shap.TreeExplainer(_model)
 
 
