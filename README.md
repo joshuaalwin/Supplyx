@@ -2,7 +2,7 @@
 
 Detects malicious npm and PyPI packages using XGBoost trained on 17 static signals (code behaviour, metadata, and text). Every prediction includes a SHAP explanation of which signals drove the score.
 
-**The pre-trained model is included** 
+**The pre-trained model is included — no training required to get started.**
 
 ---
 
@@ -10,31 +10,76 @@ Detects malicious npm and PyPI packages using XGBoost trained on 17 static signa
 
 **Requirements:** Docker, Docker Compose, Git
 
+### 1. Clone the repo
+
 ```bash
 git clone https://github.com/Elnimo-00/MLPro.git
 cd MLPro
 cp .env.example .env
-./start.sh
 ```
 
-After ~2 minutes:
+### 2. Start Postgres + MinIO
 
+```bash
+docker compose up -d postgres minio minio-init
+# Wait until Postgres is healthy (~20 sec)
+docker compose ps postgres
 ```
-  API      → http://localhost:8000/api/health
-  Airflow  → http://localhost:8080   (admin / admin)
-  MLflow   → http://localhost:5000
-  Grafana  → http://localhost:3000   (admin / admin)
-  MinIO    → http://localhost:9001   (minioadmin / minioadmin)
 
-  ✓ Model loaded — ready to score packages
+### 3. Start MLflow
+
+```bash
+docker compose up -d mlflow
+# Wait until healthy (~15 sec)
+docker compose ps mlflow
 ```
+
+### 4. Initialise Airflow
+
+```bash
+docker compose up -d airflow-init
+# Wait for the init container to exit (status "Exited 0")
+docker compose ps airflow-init
+```
+
+### 5. Start Airflow + Grafana
+
+```bash
+docker compose up -d airflow-webserver airflow-scheduler grafana
+```
+
+### 6. Start the API
+
+```bash
+docker compose up -d api
+# Wait until the API logs "startup complete"
+docker compose logs -f api
+```
+
+### 7. Verify everything is running
+
+```bash
+curl http://localhost:8000/api/health
+# → {"status":"ok","model_loaded":true}
+```
+
+| Service | URL | Credentials |
+|---|---|---|
+| REST API | http://localhost:8000 | — |
+| API docs | http://localhost:8000/docs | — |
+| Airflow | http://localhost:8080 | admin / admin |
+| MLflow | http://localhost:5000 | — |
+| Grafana | http://localhost:3000 | admin / admin |
+| MinIO | http://localhost:9001 | minioadmin / minioadmin |
+| Postgres | localhost:5432 | appuser / apppass (db: packages) |
 
 ---
 
 ## Scoring a Package
 
+The API can score any package that is already in the database. Airflow's `ingest_dag` polls PyPI and npm every 15 minutes and ingests new packages automatically. You can also trigger it manually from the Airflow UI.
+
 ```bash
-# Score any package (must exist in the database)
 curl -X POST http://localhost:8000/api/score \
   -H "Content-Type: application/json" \
   -d '{"registry":"npm","name":"000webhost-admin","version":"0.0.1-security"}'
@@ -61,7 +106,7 @@ curl http://localhost:8000/api/report/npm/000webhost-admin/0.0.1-security
 
 ## The Dataset
 
-The model was trained on two sources:
+The model was trained on two publicly available datasets:
 
 | Class | Source | Count |
 |---|---|---|
@@ -73,20 +118,18 @@ The model was trained on two sources:
 The dataset is **not included in this repo** (1.2 GB). To build it yourself:
 
 ```bash
-# Set up the Python environment
+# Set up a Python virtual environment on the host
 python3 -m venv .venv
 source .venv/bin/activate
 pip install requests psycopg2-binary mlflow xgboost scikit-learn shap pandas numpy boto3
 
-# Start the stack first (Postgres must be running)
-./start.sh
-
+# The stack must already be running (Postgres must be up)
 # Build the dataset — takes 30–60 min
 DB_HOST=localhost DB_PORT=5432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
 python3 scripts/build_dataset.py
 ```
 
-This clones `pypi_malregistry`, downloads the top PyPI/npm packages, extracts features, and writes everything to Postgres.
+This clones `pypi_malregistry`, downloads the top PyPI/npm packages, extracts all 17 features, and writes everything to Postgres.
 
 ---
 
@@ -109,6 +152,7 @@ Takes ~2 minutes. If the new model beats the current champion F1, it gets promot
 
 ```bash
 source .venv/bin/activate
+
 MLFLOW_TRACKING_URI=http://localhost:5000 \
 MLFLOW_S3_ENDPOINT_URL=http://localhost:9000 \
 AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin \
@@ -119,6 +163,7 @@ m = mlflow.xgboost.load_model('models:/malicious-package-detector@champion')
 m.save_model('model/champion.json')
 print('done')
 "
+
 docker compose up -d --build api
 ```
 
@@ -163,20 +208,6 @@ SHAP explanations → Postgres (scores table)
       ↓
 REST API :8000   +   Grafana dashboard :3000
 ```
-
----
-
-## Services
-
-| Service | URL | Credentials |
-|---|---|---|
-| REST API | http://localhost:8000 | — |
-| API docs (Swagger) | http://localhost:8000/docs | — |
-| Airflow | http://localhost:8080 | admin / admin |
-| MLflow | http://localhost:5000 | — |
-| Grafana | http://localhost:3000 | admin / admin |
-| MinIO | http://localhost:9001 | minioadmin / minioadmin |
-| Postgres | localhost:5432 | appuser / apppass (db: packages) |
 
 ---
 
