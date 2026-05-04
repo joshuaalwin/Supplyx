@@ -18,7 +18,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from sklearn.metrics import (classification_report, f1_score, precision_score,
                              recall_score, roc_auc_score)
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from xgboost import XGBClassifier
 
 from storage.db import get_conn
@@ -82,53 +82,74 @@ def train(**_) -> None:
     if n_total < 100:
         raise ValueError(f"Not enough labeled samples to train ({n_total}). Run build_dataset.py first.")
 
+    scale_pos_weight = n_ben / max(n_mal, 1)
+
+    def _make_model():
+        return XGBClassifier(
+            n_estimators=300,
+            max_depth=6,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            scale_pos_weight=scale_pos_weight,
+            eval_metric="logloss",
+            random_state=42,
+            n_jobs=-1,
+        )
+
+    # 5-fold cross-validation for honest evaluation
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    fold_f1, fold_precision, fold_recall, fold_auc = [], [], [], []
+    for fold, (train_idx, val_idx) in enumerate(cv.split(X, y), 1):
+        m = _make_model()
+        m.fit(X.iloc[train_idx], y.iloc[train_idx], verbose=False)
+        yp = m.predict(X.iloc[val_idx])
+        yprob = m.predict_proba(X.iloc[val_idx])[:, 1]
+        fold_f1.append(f1_score(y.iloc[val_idx], yp, zero_division=0))
+        fold_precision.append(precision_score(y.iloc[val_idx], yp, zero_division=0))
+        fold_recall.append(recall_score(y.iloc[val_idx], yp, zero_division=0))
+        fold_auc.append(roc_auc_score(y.iloc[val_idx], yprob))
+        print(f"[train] fold {fold}/5  f1={fold_f1[-1]:.4f}  auc={fold_auc[-1]:.4f}")
+
+    # Final model trained on full dataset
+    model = _make_model()
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
+    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
 
-    # Handle class imbalance
-    scale_pos_weight = n_ben / max(n_mal, 1)
-
-    model = XGBClassifier(
-        n_estimators=300,
-        max_depth=6,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        scale_pos_weight=scale_pos_weight,
-        eval_metric="logloss",
-        random_state=42,
-        n_jobs=-1,
-    )
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
 
     with mlflow.start_run() as run:
-        model.fit(
-            X_train, y_train,
-            eval_set=[(X_test, y_test)],
-            verbose=False,
-        )
-
-        y_pred = model.predict(X_test)
-        y_prob = model.predict_proba(X_test)[:, 1]
-
         metrics = {
-            "precision":  round(precision_score(y_test, y_pred, zero_division=0), 4),
-            "recall":     round(recall_score(y_test, y_pred, zero_division=0), 4),
-            "f1":         round(f1_score(y_test, y_pred, zero_division=0), 4),
-            "roc_auc":    round(roc_auc_score(y_test, y_prob), 4),
-            "n_train":    len(X_train),
-            "n_test":     len(X_test),
-            "n_malicious": n_mal,
-            "n_benign":    n_ben,
+            "precision":         round(precision_score(y_test, y_pred, zero_division=0), 4),
+            "recall":            round(recall_score(y_test, y_pred, zero_division=0), 4),
+            "f1":                round(f1_score(y_test, y_pred, zero_division=0), 4),
+            "roc_auc":           round(roc_auc_score(y_test, y_prob), 4),
+            "cv_f1_mean":        round(float(np.mean(fold_f1)), 4),
+            "cv_f1_std":         round(float(np.std(fold_f1)), 4),
+            "cv_auc_mean":       round(float(np.mean(fold_auc)), 4),
+            "cv_precision_mean": round(float(np.mean(fold_precision)), 4),
+            "cv_recall_mean":    round(float(np.mean(fold_recall)), 4),
+            "n_train":           len(X_train),
+            "n_test":            len(X_test),
+            "n_malicious":       n_mal,
+            "n_benign":          n_ben,
         }
+        for i, f in enumerate(fold_f1, 1):
+            metrics[f"cv_f1_fold_{i}"] = round(f, 4)
+
         mlflow.log_metrics(metrics)
         mlflow.log_params({
-            "n_estimators": 300,
-            "max_depth": 6,
-            "learning_rate": 0.05,
+            "n_estimators":     300,
+            "max_depth":        6,
+            "learning_rate":    0.05,
             "scale_pos_weight": round(scale_pos_weight, 2),
+            "cv_folds":         5,
         })
 
+        print(f"[train] CV F1: {metrics['cv_f1_mean']:.4f} ± {metrics['cv_f1_std']:.4f}")
         print(f"[train] metrics: {metrics}")
         print(classification_report(y_test, y_pred, target_names=["benign", "malicious"]))
 
