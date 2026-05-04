@@ -2,7 +2,7 @@
 
 Detects malicious npm and PyPI packages using XGBoost trained on 17 static signals (code behaviour, metadata, and text). Every prediction includes a SHAP explanation of which signals drove the score.
 
-**The pre-trained model is included** — clone and run, no training required.
+**The pre-trained model is included** 
 
 ---
 
@@ -17,7 +17,7 @@ cp .env.example .env
 ./start.sh
 ```
 
-That's it. After ~2 minutes:
+After ~2 minutes:
 
 ```
   API      → http://localhost:8000/api/health
