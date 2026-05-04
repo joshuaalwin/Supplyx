@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+.venv/
+
+# Data — too large for git (1.2 GB)
+data/pypi_malregistry/
+
+# Airflow logs
+logs/
+
+# Jupyter checkpoints
+notebooks/.ipynb_checkpoints/
+
+# Environment — contains credentials
+.env
+
+# OS
+.DS_Store
+Thumbs.db

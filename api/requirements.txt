@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+mlflow[extras]
+xgboost
+scikit-learn
+shap
+pandas
+numpy
+boto3
+psycopg2-binary

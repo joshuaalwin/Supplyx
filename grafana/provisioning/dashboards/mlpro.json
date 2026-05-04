@@ -1,0 +1,120 @@
+{
+  "title": "MLPro — Malicious Package Detection",
+  "uid": "mlpro-main",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5m",
+  "time": { "from": "now-7d", "to": "now" },
+  "tags": ["mlpro"],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Total Packages Scored",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT COUNT(*) AS value FROM scores;",
+        "format": "table", "refId": "A"
+      }],
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } }
+    },
+    {
+      "id": 2, "type": "stat", "title": "High / Critical Risk",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT COUNT(*) AS value FROM scores WHERE risk_level IN ('high','critical');",
+        "format": "table", "refId": "A"
+      }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } }
+    },
+    {
+      "id": 3, "type": "stat", "title": "Labeled Training Samples",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT COUNT(*) AS value FROM packages WHERE label IS NOT NULL;",
+        "format": "table", "refId": "A"
+      }],
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } }
+    },
+    {
+      "id": 4, "type": "stat", "title": "Live Packages Ingested",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT COUNT(*) AS value FROM packages WHERE label IS NULL;",
+        "format": "table", "refId": "A"
+      }],
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } }
+    },
+    {
+      "id": 5, "type": "piechart", "title": "Risk Level Distribution",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 8 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT risk_level AS metric, COUNT(*) AS value FROM scores GROUP BY risk_level;",
+        "format": "table", "refId": "A"
+      }],
+      "options": { "pieType": "pie", "displayLabels": ["name", "percent"] },
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "critical" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "high" },     "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "medium" },   "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "low" },      "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      }
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Packages Scored Per Day",
+      "gridPos": { "x": 0, "y": 4, "w": 16, "h": 8 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT DATE_TRUNC('day', scored_at) AS time, COUNT(*) AS value FROM scores WHERE $__timeFilter(scored_at) GROUP BY 1 ORDER BY 1;",
+        "format": "time_series", "refId": "A"
+      }],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } } }
+    },
+    {
+      "id": 7, "type": "table", "title": "Latest High / Critical Packages",
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 8 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT p.registry, p.name, p.version, s.score, s.risk_level, s.scored_at FROM packages p JOIN scores s ON s.package_id = p.id WHERE s.risk_level IN ('high','critical') ORDER BY s.score DESC LIMIT 50;",
+        "format": "table", "refId": "A"
+      }],
+      "options": { "sortBy": [{ "desc": true, "displayName": "score" }] },
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "risk_level" }, "properties": [{ "id": "custom.displayMode", "value": "color-background" }, { "id": "mappings", "value": [{ "type": "value", "options": { "critical": { "color": "red", "index": 0 }, "high": { "color": "orange", "index": 1 } } }] }] },
+          { "matcher": { "id": "byName", "options": "score" }, "properties": [{ "id": "custom.displayMode", "value": "gradient-gauge" }, { "id": "max", "value": 1 }, { "id": "min", "value": 0 }] }
+        ]
+      }
+    },
+    {
+      "id": 8, "type": "bargauge", "title": "Dataset: Malicious vs Benign",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 6 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT CASE WHEN label=1 THEN 'malicious' ELSE 'benign' END AS metric, COUNT(*) AS value FROM packages WHERE label IS NOT NULL GROUP BY label;",
+        "format": "table", "refId": "A"
+      }],
+      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } }
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Score Distribution Over Time (avg)",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 6 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{
+        "rawSql": "SELECT DATE_TRUNC('day', scored_at) AS time, AVG(score) AS avg_score, MAX(score) AS max_score FROM scores WHERE $__timeFilter(scored_at) GROUP BY 1 ORDER BY 1;",
+        "format": "time_series", "refId": "A"
+      }],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2 }, "min": 0, "max": 1 } }
+    }
+  ]
+}

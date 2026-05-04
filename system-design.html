@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ML Malicious Package Detection — System Design</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+      padding: 24px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.4rem;
+      color: #58a6ff;
+      margin-bottom: 4px;
+      letter-spacing: 0.04em;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #8b949e;
+      margin-bottom: 28px;
+    }
+    .mermaid {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>ML-Powered Malicious Package Detection System</h1>
+  <div class="subtitle">npm &amp; PyPI · Airflow · MLflow · Grafana</div>
+
+  <div class="mermaid">
+flowchart TD
+    %% ── INGESTION ──────────────────────────────────────────
+    subgraph ING["  🌐  Ingestion Layer  "]
+        direction TB
+        PYPI["PyPI API Watcher\nnew / updated packages"]
+        NPM["npm Registry Watcher\nnew / updated packages"]
+        DL["Package Downloader\n& Extractor"]
+        PYPI --> DL
+        NPM  --> DL
+    end
+
+    %% ── AIRFLOW ────────────────────────────────────────────
+    subgraph AF["  ⚙️  Airflow Orchestration  "]
+        direction LR
+        D1["DAG · Ingest\nevery 15 min"]
+        D2["DAG · Extract\non new package"]
+        D3["DAG · Train\nweekly"]
+        D4["DAG · Score\non features ready"]
+        D5["DAG · Report Gen\non score complete"]
+        D1 --> D2 --> D4 --> D5
+        D3 -. "new model\npromoted" .-> D4
+    end
+
+    %% ── FEATURE EXTRACTION ─────────────────────────────────
+    subgraph FE["  🔬  Feature Extraction  "]
+        direction TB
+        FC["Code Features\nAST · entropy · syscalls\ninstall scripts · net calls"]
+        FM["Metadata Features\nauthor age · version churn\ndep count · download delta"]
+        FT["Text Features\nNLP embeddings\nREADME · description"]
+    end
+
+    %% ── STORAGE ─────────────────────────────────────────────
+    subgraph ST["  🗄️  Storage  "]
+        direction TB
+        S3["MinIO / S3\nraw packages\nmodel artifacts"]
+        PG["PostgreSQL\nmetadata · scores\nreports"]
+        RD["Redis\njob queue · cache"]
+        FST["Feature Store\nParquet"]
+    end
+
+    %% ── ML LAYER ────────────────────────────────────────────
+    subgraph ML["  🧠  ML Layer — MLflow  "]
+        direction TB
+        TR["Model Training\nXGBoost  +  Text Classifier\n(TF-IDF / sentence-transformers)"]
+        EX["Experiment Tracking\nparams · metrics · artifacts"]
+        RG["Model Registry\nstagingproduction"]
+        IN["Inference Engine\nbatch scoring"]
+        TR --> EX
+        TR --> RG --> IN
+    end
+
+    %% ── EXPLAINABILITY ──────────────────────────────────────
+    subgraph XP["  💡  Explainability  "]
+        direction TB
+        SH["SHAP Value Computation\nper-feature contribution"]
+        RB["Report Builder\nstructured JSON + Markdown\nwhy this package is risky"]
+        SH --> RB
+    end
+
+    %% ── MONITORING ──────────────────────────────────────────
+    subgraph MN["  📊  Monitoring — Grafana  "]
+        direction TB
+        DR["Drift Detection\nEvidently"]
+        MM["Model Metrics\nPrecision · Recall · F1\nAUC-ROC"]
+        OP["Ops Metrics\nthroughput · latency\nerror rate"]
+    end
+
+    %% ── OUTPUT ──────────────────────────────────────────────
+    subgraph OUT["  🚀  Output  "]
+        direction TB
+        API["REST API\nrisk score + full report"]
+        WH["Webhook Alerts\nhigh-risk packages"]
+        GF["Grafana Dashboard\nrisk trends · model health\npackage activity"]
+    end
+
+    %% ── FLOW ─────────────────────────────────────────────────
+    DL        --> S3
+    DL        --> RD
+    D1        --> DL
+    S3        --> FC & FM & FT
+    FC & FM & FT --> FST
+    FST       --> TR
+    FST       --> IN
+    IN        --> SH
+    IN        --> PG
+    RB        --> PG
+    PG        --> API & WH
+    IN        --> DR
+    PG        --> OP
+    DR & MM & OP --> GF
+    GF        --> OUT
+
+    %% ── STYLES ───────────────────────────────────────────────
+    classDef layer fill:#161b22,stroke:#30363d,color:#c9d1d9
+    classDef store fill:#1c2128,stroke:#388bfd,color:#79c0ff
+    classDef ml    fill:#1c2128,stroke:#3fb950,color:#56d364
+    classDef out   fill:#1c2128,stroke:#f85149,color:#ff7b72
+    classDef mon   fill:#1c2128,stroke:#d29922,color:#e3b341
+
+    class ING,AF,FE layer
+    class ST,S3,PG,RD,FST store
+    class ML,TR,EX,RG,IN ml
+    class OUT,API,WH,GF out
+    class MN,DR,MM,OP mon
+  </div>
+</body>
+</html>

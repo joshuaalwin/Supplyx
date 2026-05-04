@@ -1,0 +1,11 @@
+requests
+psycopg2-binary
+minio
+apache-airflow-providers-postgres
+mlflow
+xgboost
+scikit-learn
+shap
+pandas
+numpy
+boto3
