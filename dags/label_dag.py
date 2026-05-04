@@ -201,7 +201,7 @@ def ingest_benign_pypi(**_) -> None:
     url = "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-30-days.min.json"
     resp = requests.get(url, timeout=30)
     resp.raise_for_status()
-    rows = resp.json().get("rows", [])[:500]
+    rows = resp.json().get("rows", [])[:3000]
 
     ok = skip = 0
     for row in rows:

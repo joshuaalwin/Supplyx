@@ -268,11 +268,11 @@ def ingest_malicious(workers: int) -> None:
 # ---------------------------------------------------------------------------
 
 def ingest_benign_pypi() -> None:
-    print("\n=== Benign PyPI (top-2000) ===")
+    print("\n=== Benign PyPI (top-3000) ===")
     rows = requests.get(
         "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-30-days.min.json",
         timeout=30,
-    ).json().get("rows", [])[:2000]
+    ).json().get("rows", [])[:3000]
 
     ok = skip = 0
     for row in rows:
