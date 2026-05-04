@@ -72,6 +72,7 @@ TOP_NPM = [
 
 sys.path.insert(0, str(ROOT / "dags"))
 from extractors.code_features import extract_code_features
+from extractors.guarddog_features import extract_guarddog_features
 from extractors.metadata_features import extract_metadata_features
 from extractors.text_features import extract_text_features
 
@@ -101,11 +102,15 @@ def save(
     keywords: list, downloads: int,
     label: int, label_source: str,
     features: dict,
+    guarddog: dict | None = None,
 ) -> None:
-    raw_features = json.dumps({
+    raw_payload = {
         k: v for k, v in features.items()
         if not isinstance(v, (dict, list))
-    })
+    }
+    if guarddog:
+        raw_payload["guarddog"] = guarddog
+    raw_features = json.dumps(raw_payload)
     with _conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -218,13 +223,14 @@ def process_tarball(tar_path: Path) -> str:
                 **extract_metadata_features(pkg_meta),
                 **extract_text_features(pkg_dir, pkg_meta),
             }
+            guarddog_f = extract_guarddog_features(pkg_dir, "pypi")
 
         save(
             registry="pypi", name=name, version=version,
             author=None, description=None, homepage=None,
             repository=None, keywords=[], downloads=0,
             label=1, label_source="pypi_malregistry",
-            features=features,
+            features=features, guarddog=guarddog_f,
         )
         return f"ok    {name}@{version}"
     except Exception as exc:
@@ -313,13 +319,14 @@ def ingest_benign_pypi() -> None:
                     **extract_metadata_features(pkg_meta),
                     **extract_text_features(pkg_dir, pkg_meta),
                 }
+                guarddog_f = extract_guarddog_features(pkg_dir, "pypi")
             save(
                 registry="pypi", name=name, version=version,
                 author=info.get("author"), description=info.get("summary"),
                 homepage=info.get("home_page"), repository=None,
                 keywords=[], downloads=min(row.get("download_count", 0), 9_000_000_000),
                 label=0, label_source="top_pypi",
-                features=features,
+                features=features, guarddog=guarddog_f,
             )
             ok += 1
             if ok % 50 == 0:
@@ -371,6 +378,7 @@ def ingest_benign_npm() -> None:
                     **extract_metadata_features(pkg_meta),
                     **extract_text_features(pkg_dir, pkg_meta),
                 }
+                guarddog_f = extract_guarddog_features(pkg_dir, "npm")
             author = info.get("author")
             save(
                 registry="npm", name=name, version=version,
@@ -379,7 +387,7 @@ def ingest_benign_npm() -> None:
                 homepage=info.get("homepage"), repository=None,
                 keywords=(info.get("keywords") or [])[:20], downloads=0,
                 label=0, label_source="top_npm",
-                features=features,
+                features=features, guarddog=guarddog_f,
             )
             ok += 1
         except Exception as exc:

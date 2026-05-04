@@ -9,6 +9,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 from extractors.code_features import extract_code_features
+from extractors.guarddog_features import extract_guarddog_features
 from extractors.metadata_features import extract_metadata_features
 from extractors.text_features import extract_text_features
 from storage.db import get_pending_packages, set_extraction_status, upsert_features
@@ -85,6 +86,7 @@ def extract_features_batch(**_) -> None:
                 code_f = extract_code_features(pkg_dir)
                 meta_f = extract_metadata_features(pkg_meta)
                 text_f = extract_text_features(pkg_dir, pkg_meta)
+                guarddog_f = extract_guarddog_features(pkg_dir, registry)
 
             upsert_features(
                 pkg_id,
@@ -92,7 +94,10 @@ def extract_features_batch(**_) -> None:
                     **code_f,
                     **meta_f,
                     **text_f,
-                    "raw_features": {**code_f, **meta_f, **text_f},
+                    "raw_features": {
+                        **code_f, **meta_f, **text_f,
+                        "guarddog": guarddog_f,
+                    },
                 },
             )
             set_extraction_status(pkg_id, "done")

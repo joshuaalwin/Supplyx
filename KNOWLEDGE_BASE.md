@@ -85,7 +85,8 @@ MLPro/
 │   ├── extractors/
 │   │   ├── code_features.py      # 10 code signals (entropy, exec, network, etc.)
 │   │   ├── metadata_features.py  # 5 metadata signals (typosquat, versions, repo link)
-│   │   └── text_features.py      # 4 text signals (description, README, phrases)
+│   │   ├── text_features.py      # 4 text signals (description, README, phrases)
+│   │   └── guarddog_features.py  # GuardDog scanner output — capture mode only
 │   │
 │   └── storage/
 │       ├── db.py                 # PostgreSQL helpers (upsert, query, status)
@@ -352,6 +353,33 @@ From notebook analysis:
 ### Model file
 
 `model/champion.json` (206 KB) — bundled pre-trained model. The API loads this by default on startup. If a new champion is trained via MLflow, the API can fall back to MLflow's model registry.
+
+---
+
+## 9.5 GuardDog Capture (Phase 1)
+
+**Status**: capture-only. GuardDog signals are stored but **not used by the model**.
+
+The `guarddog_features` extractor wraps the DataDog GuardDog CLI (pinned to `2.9.0`) and runs it on every extracted package. Output is stored in the existing `raw_features` JSONB column under the key `guarddog`. Failure modes (timeout, missing binary, malformed JSON, non-zero exit) all return `{}` so extraction never fails because of GuardDog.
+
+**What it captures per package:**
+- `guarddog_findings_count` — total issues found
+- `guarddog_rules_triggered` — list of rule names that fired
+- `guarddog_categories` — high-level boolean flags:
+  - `has_crypto_mining`
+  - `has_clipboard_access`
+  - `has_silent_exec`
+  - `has_bundled_binary`
+  - `has_token_theft`
+  - `has_cmd_overwrite`
+  - `has_exfiltration`
+
+**Query GuardDog data:**
+```sql
+SELECT raw_features->'guarddog' FROM features ORDER BY extracted_at DESC LIMIT 5;
+```
+
+**Phase 2 decision gate** (separate effort): after ~7 days of capture, evaluate whether GuardDog is firing on packages our 17 features miss. If yes, schema migration + retrain to promote selected GuardDog signals to model features. If no, remove or keep capturing.
 
 ---
 

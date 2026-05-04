@@ -9,3 +9,4 @@ shap
 pandas
 numpy
 boto3
+guarddog==2.9.0
