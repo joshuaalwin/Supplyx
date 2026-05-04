@@ -12,7 +12,7 @@ _session.headers["User-Agent"] = "mlpro-scanner/1.0 (security research)"
 def get_recent_packages(limit: int = 100) -> list[dict]:
     resp = _session.get(
         NPM_SEARCH,
-        params={"text": "", "sort": "modified", "size": min(limit, 250)},
+        params={"text": "a", "from": 0, "size": min(limit, 250)},
         timeout=30,
     )
     resp.raise_for_status()

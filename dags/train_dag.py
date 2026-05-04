@@ -16,8 +16,8 @@ import pandas as pd
 import shap
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from sklearn.metrics import (classification_report, f1_score, precision_score,
-                             recall_score, roc_auc_score)
+from sklearn.metrics import (classification_report, f1_score, precision_recall_curve,
+                             precision_score, recall_score, roc_auc_score)
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from xgboost import XGBClassifier
 
@@ -121,6 +121,13 @@ def train(**_) -> None:
     y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1]
 
+    # Find F1-optimal decision threshold from precision-recall curve
+    precisions, recalls, thresholds = precision_recall_curve(y_test, y_prob)
+    f1_curve = 2 * precisions * recalls / (precisions + recalls + 1e-10)
+    optimal_idx = int(np.argmax(f1_curve[:-1])) if len(thresholds) else 0
+    optimal_threshold = float(thresholds[optimal_idx]) if len(thresholds) else 0.5
+    optimal_f1 = float(f1_curve[optimal_idx])
+
     with mlflow.start_run() as run:
         metrics = {
             "precision":         round(precision_score(y_test, y_pred, zero_division=0), 4),
@@ -132,6 +139,8 @@ def train(**_) -> None:
             "cv_auc_mean":       round(float(np.mean(fold_auc)), 4),
             "cv_precision_mean": round(float(np.mean(fold_precision)), 4),
             "cv_recall_mean":    round(float(np.mean(fold_recall)), 4),
+            "optimal_threshold": round(optimal_threshold, 4),
+            "optimal_f1":        round(optimal_f1, 4),
             "n_train":           len(X_train),
             "n_test":            len(X_test),
             "n_malicious":       n_mal,
@@ -150,6 +159,7 @@ def train(**_) -> None:
         })
 
         print(f"[train] CV F1: {metrics['cv_f1_mean']:.4f} ± {metrics['cv_f1_std']:.4f}")
+        print(f"[train] optimal threshold: {optimal_threshold:.4f} (F1={optimal_f1:.4f}) — default 0.5 still used for predict()")
         print(f"[train] metrics: {metrics}")
         print(classification_report(y_test, y_pred, target_names=["benign", "malicious"]))
 
@@ -183,6 +193,15 @@ def train(**_) -> None:
         if should_promote:
             client.set_registered_model_alias(MODEL_NAME, "champion", latest.version)
             print(f"[train] promoted version {latest.version} to champion (F1={metrics['f1']})")
+
+            # Auto-export to model file so the API picks up the new champion on next restart
+            model_file = "/opt/airflow/model/champion.json"
+            try:
+                os.makedirs(os.path.dirname(model_file), exist_ok=True)
+                model.save_model(model_file)
+                print(f"[train] exported champion to {model_file}")
+            except Exception as exc:
+                print(f"[train] could not export champion file: {exc}")
         else:
             print(f"[train] version {latest.version} kept — did not beat champion F1")
 

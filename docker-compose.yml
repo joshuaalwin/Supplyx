@@ -29,6 +29,7 @@ x-airflow-common: &airflow-common
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
+    - ./model:/opt/airflow/model
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
@@ -124,6 +125,8 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
+    volumes:
+      - ./model:/app/model
     ports:
       - "8000:8000"
     depends_on:
