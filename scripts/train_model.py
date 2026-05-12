@@ -14,6 +14,17 @@ import os
 import sys
 import tempfile
 
+# Sensible host-side defaults — override by exporting before running.
+os.environ.setdefault("DB_HOST", "localhost")
+os.environ.setdefault("DB_PORT", "15432")
+os.environ.setdefault("DB_NAME", "packages")
+os.environ.setdefault("DB_USER", "appuser")
+os.environ.setdefault("DB_PASS", "apppass")
+os.environ.setdefault("MLFLOW_TRACKING_URI", "http://localhost:5000")
+os.environ.setdefault("MLFLOW_S3_ENDPOINT_URL", "http://localhost:9000")
+os.environ.setdefault("AWS_ACCESS_KEY_ID", "minioadmin")
+os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "minioadmin")
+
 import mlflow
 import mlflow.xgboost
 import numpy as np

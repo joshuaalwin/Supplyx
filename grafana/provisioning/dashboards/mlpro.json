@@ -2,118 +2,401 @@
   "title": "MLPro — Malicious Package Detection",
   "uid": "mlpro-main",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 5,
   "refresh": "5m",
   "time": { "from": "now-7d", "to": "now" },
-  "tags": ["mlpro"],
+  "tags": ["mlpro", "ml"],
   "panels": [
+
     {
-      "id": 1, "type": "stat", "title": "Total Packages Scored",
-      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
-      "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT COUNT(*) AS value FROM scores;",
-        "format": "table", "refId": "A"
-      }],
-      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } }
+      "id": 100, "type": "row",
+      "title": "Model Performance — v7-Robust (13 features, 400 trees)",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
     },
+
     {
-      "id": 2, "type": "stat", "title": "High / Critical Risk",
-      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "id": 101, "type": "stat", "title": "F1 Score",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
       "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT COUNT(*) AS value FROM scores WHERE risk_level IN ('high','critical');",
-        "format": "table", "refId": "A"
-      }],
+      "targets": [{ "rawSql": "SELECT f1 AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
       "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } }
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 4,
+        "thresholds": { "steps": [
+          { "color": "red", "value": null },
+          { "color": "orange", "value": 0.7 },
+          { "color": "green", "value": 0.85 }
+        ] } } }
     },
+
     {
-      "id": 3, "type": "stat", "title": "Labeled Training Samples",
-      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "id": 102, "type": "stat", "title": "Precision (malicious)",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
       "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT COUNT(*) AS value FROM packages WHERE label IS NOT NULL;",
-        "format": "table", "refId": "A"
-      }],
+      "targets": [{ "rawSql": "SELECT precision_score AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 4,
+        "thresholds": { "steps": [
+          { "color": "red", "value": null },
+          { "color": "orange", "value": 0.85 },
+          { "color": "green", "value": 0.95 }
+        ] } } }
+    },
+
+    {
+      "id": 103, "type": "stat", "title": "Recall (malicious)",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT recall AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 4,
+        "thresholds": { "steps": [
+          { "color": "red", "value": null },
+          { "color": "orange", "value": 0.75 },
+          { "color": "green", "value": 0.85 }
+        ] } } }
+    },
+
+    {
+      "id": 104, "type": "stat", "title": "ROC-AUC",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT roc_auc AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 4,
+        "thresholds": { "steps": [
+          { "color": "red", "value": null },
+          { "color": "orange", "value": 0.85 },
+          { "color": "green", "value": 0.95 }
+        ] } } }
+    },
+
+    {
+      "id": 105, "type": "stat", "title": "Accuracy",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT accuracy AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
       "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } }
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "decimals": 4 } }
     },
+
     {
-      "id": 4, "type": "stat", "title": "Live Packages Ingested",
-      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "id": 106, "type": "stat", "title": "Model Version",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
       "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT COUNT(*) AS value FROM packages WHERE label IS NULL;",
-        "format": "table", "refId": "A"
-      }],
-      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "color": "blue", "value": null }] } } }
+      "targets": [{ "rawSql": "SELECT 'v' || model_version || ' (' || model_label || ')' AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" } },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" } } }
     },
+
     {
-      "id": 5, "type": "piechart", "title": "Risk Level Distribution",
-      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 8 },
+      "id": 110, "type": "row",
+      "title": "Confusion Matrix (held-out test set)",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 111, "type": "stat", "title": "True Negatives (benign → benign)",
+      "gridPos": { "x": 0, "y": 6, "w": 6, "h": 4 },
       "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT risk_level AS metric, COUNT(*) AS value FROM scores GROUP BY risk_level;",
-        "format": "table", "refId": "A"
-      }],
-      "options": { "pieType": "pie", "displayLabels": ["name", "percent"] },
+      "targets": [{ "rawSql": "SELECT tn AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } } }
+    },
+
+    {
+      "id": 112, "type": "stat", "title": "False Positives (benign → malicious)",
+      "gridPos": { "x": 6, "y": 6, "w": 6, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT fp AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" } } }
+    },
+
+    {
+      "id": 113, "type": "stat", "title": "False Negatives (malicious → benign)",
+      "gridPos": { "x": 12, "y": 6, "w": 6, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT fn AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } } }
+    },
+
+    {
+      "id": 114, "type": "stat", "title": "True Positives (malicious → malicious)",
+      "gridPos": { "x": 18, "y": 6, "w": 6, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT tp AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } } }
+    },
+
+    {
+      "id": 120, "type": "row",
+      "title": "Feature Importance & Training Set",
+      "gridPos": { "x": 0, "y": 10, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 121, "type": "barchart",
+      "title": "SHAP Feature Importance (top 13)",
+      "gridPos": { "x": 0, "y": 11, "w": 14, "h": 9 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT feature_name, ROUND(importance::numeric, 4) AS importance FROM model_shap ORDER BY importance DESC LIMIT 13;", "format": "table", "refId": "A" }],
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "always",
+        "xField": "feature_name",
+        "barWidth": 0.85,
+        "groupWidth": 0.7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-GrYlRd" },
+          "decimals": 4
+        }
+      }
+    },
+
+    {
+      "id": 122, "type": "piechart",
+      "title": "Training-Set Class Balance",
+      "gridPos": { "x": 14, "y": 11, "w": 10, "h": 9 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "(SELECT 'malicious' AS class, n_malicious AS count FROM model_metrics ORDER BY recorded_at DESC LIMIT 1) UNION ALL (SELECT 'benign' AS class, n_benign AS count FROM model_metrics ORDER BY recorded_at DESC LIMIT 1);", "format": "table", "refId": "A" }],
+      "transformations": [
+        { "id": "rowsToFields", "options": { "mappings": [
+          { "fieldName": "class", "handlerKey": "field.name" },
+          { "fieldName": "count", "handlerKey": "field.value" }
+        ] } }
+      ],
+      "options": {
+        "pieType": "donut",
+        "displayLabels": ["name", "percent", "value"],
+        "legend": { "displayMode": "list", "placement": "right" },
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }
+      },
+      "fieldConfig": {
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "malicious" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "benign" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      }
+    },
+
+    {
+      "id": 123, "type": "stat", "title": "mal:ben ratio",
+      "gridPos": { "x": 14, "y": 16, "w": 5, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT ROUND((n_malicious::numeric / NULLIF(n_benign,0))::numeric, 2) AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "decimals": 2, "color": { "mode": "fixed", "fixedColor": "yellow" } } }
+    },
+
+    {
+      "id": 124, "type": "stat", "title": "scale_pos_weight",
+      "gridPos": { "x": 19, "y": 16, "w": 5, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT scale_pos_weight AS value FROM model_metrics ORDER BY recorded_at DESC LIMIT 1;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "decimals": 4, "color": { "mode": "fixed", "fixedColor": "purple" } } }
+    },
+
+    {
+      "id": 130, "type": "row", "title": "Adversarial Robustness",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 1 }, "collapsed": false
+    },
+
+    {
+      "id": 131, "type": "gauge",
+      "title": "Evasion Rate — Text-Padding Attack",
+      "gridPos": { "x": 0, "y": 21, "w": 12, "h": 6 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT MAX(CASE WHEN model_label='v1' THEN ROUND((rate*100)::numeric,1) END) AS \"v1 Baseline\", MAX(CASE WHEN model_label='v7' THEN ROUND((rate*100)::numeric,1) END) AS \"v7 Robust\" FROM model_adversarial WHERE attack_class='text_padding';", "format": "table", "refId": "A" }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" },
+        "orientation": "horizontal",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1, "unit": "percent", "min": 0, "max": 100,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 30 },
+            { "color": "red", "value": 70 }
+          ] }
+        }
+      }
+    },
+
+    {
+      "id": 132, "type": "gauge",
+      "title": "Evasion Rate — Metadata-Claim Attack",
+      "gridPos": { "x": 12, "y": 21, "w": 12, "h": 6 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT MAX(CASE WHEN model_label='v1' THEN ROUND((rate*100)::numeric,1) END) AS \"v1 Baseline\", MAX(CASE WHEN model_label='v7' THEN ROUND((rate*100)::numeric,1) END) AS \"v7 Robust\" FROM model_adversarial WHERE attack_class='metadata_claim';", "format": "table", "refId": "A" }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" },
+        "orientation": "horizontal",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1, "unit": "percent", "min": 0, "max": 100,
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 30 },
+            { "color": "red", "value": 70 }
+          ] }
+        }
+      }
+    },
+
+    {
+      "id": 140, "type": "row", "title": "Live Scoring Operations",
+      "gridPos": { "x": 0, "y": 27, "w": 24, "h": 1 }, "collapsed": false
+    },
+
+    {
+      "id": 141, "type": "stat", "title": "Total Packages Scored",
+      "gridPos": { "x": 0, "y": 28, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT COUNT(*) AS value FROM scores;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } } }
+    },
+
+    {
+      "id": 142, "type": "stat", "title": "High / Critical Risk",
+      "gridPos": { "x": 4, "y": 28, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT COUNT(*) AS value FROM scores WHERE risk_level IN ('high','critical');", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" },
+        "thresholds": { "steps": [
+          { "color": "green", "value": null },
+          { "color": "red", "value": 1 }
+        ] } } }
+    },
+
+    {
+      "id": 143, "type": "stat", "title": "Labeled Training Samples",
+      "gridPos": { "x": 8, "y": 28, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT COUNT(*) AS value FROM packages WHERE label IS NOT NULL;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } } }
+    },
+
+    {
+      "id": 144, "type": "stat", "title": "Live Packages Ingested",
+      "gridPos": { "x": 12, "y": 28, "w": 4, "h": 4 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT COUNT(*) AS value FROM packages WHERE label IS NULL;", "format": "table", "refId": "A" }],
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } } }
+    },
+
+    {
+      "id": 145, "type": "piechart",
+      "title": "Risk Level Distribution",
+      "gridPos": { "x": 16, "y": 28, "w": 8, "h": 8 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT risk_level, COUNT(*) AS count FROM scores GROUP BY risk_level ORDER BY count DESC;", "format": "table", "refId": "A" }],
+      "transformations": [
+        { "id": "rowsToFields", "options": { "mappings": [
+          { "fieldName": "risk_level", "handlerKey": "field.name" },
+          { "fieldName": "count", "handlerKey": "field.value" }
+        ] } }
+      ],
+      "options": {
+        "pieType": "donut",
+        "displayLabels": ["name", "percent", "value"],
+        "legend": { "displayMode": "list", "placement": "right" },
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }
+      },
       "fieldConfig": {
         "overrides": [
           { "matcher": { "id": "byName", "options": "critical" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "high" },     "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "medium" },   "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "low" },      "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+          { "matcher": { "id": "byName", "options": "high" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "medium" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "low" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
         ]
       }
     },
+
     {
-      "id": 6, "type": "timeseries", "title": "Packages Scored Per Day",
-      "gridPos": { "x": 0, "y": 4, "w": 16, "h": 8 },
+      "id": 146, "type": "barchart",
+      "title": "Score Distribution (histogram)",
+      "gridPos": { "x": 0, "y": 32, "w": 16, "h": 7 },
       "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT DATE_TRUNC('day', scored_at) AS time, COUNT(*) AS value FROM scores WHERE $__timeFilter(scored_at) GROUP BY 1 ORDER BY 1;",
-        "format": "time_series", "refId": "A"
-      }],
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } } }
+      "targets": [{ "rawSql": "SELECT CONCAT(ROUND((WIDTH_BUCKET(score,0,1,10)-1)*0.1,1), '-', ROUND(WIDTH_BUCKET(score,0,1,10)*0.1,1)) AS range, COUNT(*) AS packages FROM scores GROUP BY WIDTH_BUCKET(score,0,1,10) ORDER BY WIDTH_BUCKET(score,0,1,10);", "format": "table", "refId": "A" }],
+      "options": {
+        "orientation": "vertical",
+        "showValue": "always",
+        "xField": "range",
+        "barWidth": 0.9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-GrYlRd" }
+        }
+      }
     },
+
     {
-      "id": 7, "type": "table", "title": "Latest High / Critical Packages",
-      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 8 },
+      "id": 150, "type": "row", "title": "Latest High / Critical Packages",
+      "gridPos": { "x": 0, "y": 39, "w": 24, "h": 1 }, "collapsed": false
+    },
+
+    {
+      "id": 151, "type": "table", "title": "Latest High / Critical Packages",
+      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 8 },
       "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT p.registry, p.name, p.version, s.score, s.risk_level, s.scored_at FROM packages p JOIN scores s ON s.package_id = p.id WHERE s.risk_level IN ('high','critical') ORDER BY s.score DESC LIMIT 50;",
-        "format": "table", "refId": "A"
-      }],
-      "options": { "sortBy": [{ "desc": true, "displayName": "score" }] },
+      "targets": [{ "rawSql": "SELECT p.registry, p.name, p.version, s.score, s.risk_level, s.scored_at FROM packages p JOIN scores s ON s.package_id = p.id WHERE s.risk_level IN ('high','critical') ORDER BY s.scored_at DESC, s.score DESC LIMIT 50;", "format": "table", "refId": "A" }],
+      "options": { "sortBy": [{ "desc": true, "displayName": "scored_at" }] },
       "fieldConfig": {
         "overrides": [
-          { "matcher": { "id": "byName", "options": "risk_level" }, "properties": [{ "id": "custom.displayMode", "value": "color-background" }, { "id": "mappings", "value": [{ "type": "value", "options": { "critical": { "color": "red", "index": 0 }, "high": { "color": "orange", "index": 1 } } }] }] },
-          { "matcher": { "id": "byName", "options": "score" }, "properties": [{ "id": "custom.displayMode", "value": "gradient-gauge" }, { "id": "max", "value": 1 }, { "id": "min", "value": 0 }] }
+          { "matcher": { "id": "byName", "options": "risk_level" }, "properties": [
+            { "id": "custom.displayMode", "value": "color-background" },
+            { "id": "mappings", "value": [{ "type": "value", "options": {
+                "critical": { "color": "red", "index": 0 },
+                "high":     { "color": "orange", "index": 1 }
+            } }] }
+          ] },
+          { "matcher": { "id": "byName", "options": "score" }, "properties": [
+            { "id": "custom.displayMode", "value": "gradient-gauge" },
+            { "id": "max", "value": 1 }, { "id": "min", "value": 0 }, { "id": "decimals", "value": 4 }
+          ] }
         ]
       }
     },
+
     {
-      "id": 8, "type": "bargauge", "title": "Dataset: Malicious vs Benign",
-      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 6 },
-      "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT CASE WHEN label=1 THEN 'malicious' ELSE 'benign' END AS metric, COUNT(*) AS value FROM packages WHERE label IS NOT NULL GROUP BY label;",
-        "format": "table", "refId": "A"
-      }],
-      "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } }
+      "id": 160, "type": "row", "title": "Throughput & Trends",
+      "gridPos": { "x": 0, "y": 48, "w": 24, "h": 1 }, "collapsed": false
     },
+
     {
-      "id": 9, "type": "timeseries", "title": "Score Distribution Over Time (avg)",
-      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 6 },
+      "id": 161, "type": "timeseries", "title": "Packages Scored Per Day",
+      "gridPos": { "x": 0, "y": 49, "w": 12, "h": 7 },
       "datasource": { "uid": "mlpro-postgres" },
-      "targets": [{
-        "rawSql": "SELECT DATE_TRUNC('day', scored_at) AS time, AVG(score) AS avg_score, MAX(score) AS max_score FROM scores WHERE $__timeFilter(scored_at) GROUP BY 1 ORDER BY 1;",
-        "format": "time_series", "refId": "A"
-      }],
+      "targets": [{ "rawSql": "SELECT DATE_TRUNC('day', scored_at) AS time, COUNT(*) AS value FROM scores WHERE $__timeFilter(scored_at) GROUP BY 1 ORDER BY 1;", "format": "time_series", "refId": "A" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+    },
+
+    {
+      "id": 162, "type": "timeseries", "title": "Mean / Max Risk Score Per Day",
+      "gridPos": { "x": 12, "y": 49, "w": 12, "h": 7 },
+      "datasource": { "uid": "mlpro-postgres" },
+      "targets": [{ "rawSql": "SELECT DATE_TRUNC('day', scored_at) AS time, AVG(score) AS avg_score, MAX(score) AS max_score FROM scores WHERE $__timeFilter(scored_at) GROUP BY 1 ORDER BY 1;", "format": "time_series", "refId": "A" }],
       "fieldConfig": { "defaults": { "custom": { "lineWidth": 2 }, "min": 0, "max": 1 } }
     }
   ]

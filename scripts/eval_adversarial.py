@@ -20,6 +20,13 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
+# Sensible host-side defaults — override by exporting before running.
+os.environ.setdefault("DB_HOST", "localhost")
+os.environ.setdefault("DB_PORT", "15432")
+os.environ.setdefault("DB_NAME", "packages")
+os.environ.setdefault("DB_USER", "appuser")
+os.environ.setdefault("DB_PASS", "apppass")
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

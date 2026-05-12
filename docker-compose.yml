@@ -48,6 +48,7 @@ services:
       - ./init/init_db.sql:/docker-entrypoint-initdb.d/01_init_db.sql
       - ./init/add_labels.sql:/docker-entrypoint-initdb.d/02_add_labels.sql
       - ./init/add_scores.sql:/docker-entrypoint-initdb.d/03_add_scores.sql
+      - ./init/add_model_metrics.sql:/docker-entrypoint-initdb.d/04_add_model_metrics.sql
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s

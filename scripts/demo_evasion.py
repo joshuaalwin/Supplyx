@@ -17,6 +17,14 @@ import os
 import sys
 from pathlib import Path
 
+# Sensible defaults so the script works without per-invocation env vars.
+# Override by exporting DB_HOST / DB_PORT before running.
+os.environ.setdefault("DB_HOST", "localhost")
+os.environ.setdefault("DB_PORT", "15432")
+os.environ.setdefault("DB_NAME", "packages")
+os.environ.setdefault("DB_USER", "appuser")
+os.environ.setdefault("DB_PASS", "apppass")
+
 import pandas as pd
 from xgboost import XGBClassifier
 
@@ -120,7 +128,7 @@ def main():
     base_v7 = score(v7, V7_FEATURES, pkg)
     pad_v7 = score(v7, V7_FEATURES, pkg_pad)  # same row — v7 doesn't read description_length/readme_length anyway
 
-    print("=== v7-Robust (15 features, monotonic) ===")
+    print("=== v7-Robust (13 features, monotonic) ===")
     print(f"   Original score:                {base_v7:.4f}  ({'critical' if base_v7>=0.8 else 'high' if base_v7>=0.6 else 'med' if base_v7>=0.3 else 'low'})")
     print(f"   After description=120/readme=2000: {pad_v7:.4f}  (text features not in model)")
     print(f"   --> score moved by {(base_v7 - pad_v7):+.4f}")
