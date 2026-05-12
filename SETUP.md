@@ -129,7 +129,7 @@ echo "MLflow ready"
 ```
 
 At this point you have:
-- PostgreSQL at `localhost:5432` — two databases: `airflow` (Airflow internals) and `packages` (your data)
+- PostgreSQL at `localhost:15432` (host-mapped; internal port 5432) — two databases: `airflow` (Airflow internals) and `packages` (your data)
 - MinIO at `localhost:9000` — three buckets: `packages`, `features`, `mlflow`
 - MLflow at `localhost:5000`
 
@@ -286,11 +286,11 @@ cd ~/MLPro
 source .venv/bin/activate
 
 # Full run — clones pypi_malregistry (~800 MB) + downloads benign packages
-DB_HOST=localhost DB_PORT=5432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
+DB_HOST=localhost DB_PORT=15432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
 python3 scripts/build_dataset.py
 
 # If pypi_malregistry is already cloned in data/
-DB_HOST=localhost DB_PORT=5432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
+DB_HOST=localhost DB_PORT=15432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
 python3 scripts/build_dataset.py --skip-clone
 ```
 
@@ -320,7 +320,7 @@ MLFLOW_TRACKING_URI=http://localhost:5000 \
 MLFLOW_S3_ENDPOINT_URL=http://localhost:9000 \
 AWS_ACCESS_KEY_ID=minioadmin \
 AWS_SECRET_ACCESS_KEY=minioadmin \
-DB_HOST=localhost DB_PORT=5432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
+DB_HOST=localhost DB_PORT=15432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
 python3 scripts/train_model.py
 ```
 
@@ -434,7 +434,7 @@ Open the URL printed in the terminal. Run all cells top to bottom with Shift+Ent
 | API docs | http://localhost:8000/docs | — | Interactive Swagger UI |
 | Grafana | http://localhost:3000 | admin / admin | Dashboards |
 | MinIO console | http://localhost:9001 | minioadmin / minioadmin | Object store browser |
-| PostgreSQL | localhost:5432 | appuser / apppass | packages DB |
+| PostgreSQL | localhost:15432 | appuser / apppass | packages DB |
 
 ---
 

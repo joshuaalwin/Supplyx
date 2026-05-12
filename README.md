@@ -1,6 +1,6 @@
 # MLPro — ML-Powered Malicious Package Detection
 
-Detects malicious npm and PyPI packages using XGBoost trained on 17 static signals (code behaviour, metadata, and text). Every prediction includes a SHAP explanation of which signals drove the score.
+Detects malicious npm and PyPI packages using XGBoost trained on 13 static signals (10 code-behaviour + 3 metadata). Every prediction includes a SHAP explanation of which signals drove the score.
 
 **The pre-trained model is included — no training required to get started.**
 
@@ -71,7 +71,7 @@ curl http://localhost:8000/api/health
 | MLflow | http://localhost:5000 | — |
 | Grafana | http://localhost:3000 | admin / admin |
 | MinIO | http://localhost:9001 | minioadmin / minioadmin |
-| Postgres | localhost:5432 | appuser / apppass (db: packages) |
+| Postgres | localhost:15432 | appuser / apppass (db: packages) |
 
 ---
 
@@ -125,11 +125,11 @@ pip install requests psycopg2-binary mlflow xgboost scikit-learn shap pandas num
 
 # The stack must already be running (Postgres must be up)
 # Build the dataset — takes 30–60 min
-DB_HOST=localhost DB_PORT=5432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
+DB_HOST=localhost DB_PORT=15432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
 python3 scripts/build_dataset.py
 ```
 
-This clones `pypi_malregistry`, downloads the top PyPI/npm packages, extracts all 17 features, and writes everything to Postgres.
+This clones `pypi_malregistry`, downloads the top PyPI/npm packages, extracts all 15 model features (plus 2 collection-only text fields kept in the DB but excluded from the model), and writes everything to Postgres.
 
 ---
 
@@ -144,11 +144,11 @@ MLFLOW_TRACKING_URI=http://localhost:5000 \
 MLFLOW_S3_ENDPOINT_URL=http://localhost:9000 \
 AWS_ACCESS_KEY_ID=minioadmin \
 AWS_SECRET_ACCESS_KEY=minioadmin \
-DB_HOST=localhost DB_PORT=5432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
+DB_HOST=localhost DB_PORT=15432 DB_NAME=packages DB_USER=appuser DB_PASS=apppass \
 python3 scripts/train_model.py
 ```
 
-Takes ~2 minutes. If the new model beats the current champion F1, it gets promoted automatically. Copy the new model file so the API uses it:
+Takes ~2 minutes. Trains XGBoost on 13 features with monotonic constraints and 400 estimators. If the new model beats the current champion F1, it gets promoted automatically. Copy the new model file so the API uses it:
 
 ```bash
 source .venv/bin/activate
@@ -169,27 +169,39 @@ docker compose up -d --build api
 
 ---
 
-## The 17 Features
+## The 13 Features
 
-| Category | Feature | What it detects |
-|---|---|---|
-| Code | `entropy_max` | Base64/obfuscated payloads |
-| Code | `has_network_in_install` | Exfiltration during `pip install` |
-| Code | `has_credential_access` | Reads `~/.aws`, `~/.ssh`, env tokens |
-| Code | `has_exec_eval` | `eval()`/`exec()` on downloaded content |
-| Code | `has_obfuscated_code` | Encoded or compressed code |
-| Code | `has_os_targeting` | OS-specific attack logic |
-| Code | `has_external_payload` | Downloads and executes a remote file |
-| Code | `install_script_lines` | Abnormally long install hooks |
-| Code | `dangerous_import_count` | `subprocess`, `socket`, `ctypes`, etc. |
-| Code | `api_category_count` | Multiple suspicious API categories used |
-| Metadata | `is_typosquat` | Name ≤2 edits from a popular package |
-| Metadata | `typosquat_distance` | Edit distance to nearest popular package |
-| Metadata | `has_repo_link` | No repository link |
-| Metadata | `version_count` | Only 1 version (throwaway account) |
-| Metadata | `version_jump_suspicious` | Jumped from 0.1 to 9.9 |
-| Text | `description_length` | Empty or placeholder description |
-| Text | `readme_length` | Missing or copied README |
+XGBoost is trained with **monotonic constraints** so each feature is forced to move
+risk in the direction below — eliminating learned spurious correlations.
+
+| Category | Feature | Monotonic | What it detects |
+|---|---|---|---|
+| Code | `entropy_max` | +1 | Base64/obfuscated payloads |
+| Code | `has_network_in_install` | +1 | Exfiltration during `pip install` |
+| Code | `has_credential_access` | +1 | Reads `~/.aws`, `~/.ssh`, env tokens |
+| Code | `has_exec_eval` | +1 | `eval()`/`exec()` co-located with decode/download |
+| Code | `has_obfuscated_code` | +1 | Long base64 / hex / encoded payloads |
+| Code | `has_os_targeting` | +1 | Platform check gating a suspicious payload |
+| Code | `has_external_payload` | +1 | Downloads then executes a remote file |
+| Code | `install_script_lines` | +1 | Abnormally long install hooks |
+| Code | `dangerous_import_count` | +1 | `ctypes`, `cffi`, `marshal`, or network imports in install |
+| Code | `api_category_count` | +1 | Suspicious shell / exfil / dyn-exec / persistence combos |
+| Metadata | `is_typosquat` | +1 | Name ≤2 edits from a popular package |
+| Metadata | `typosquat_distance` | 0 | Edit distance (0 = on top-package list) |
+| Metadata | `version_jump_suspicious` | +1 | Jumped from 0.1 to 9.9 |
+
+> **Removed post-audit (4 features):** Two rounds of adversarial auditing eliminated
+> features that were collection artifacts rather than malicious-behaviour signals:
+>
+> - **Round 1** — `description_length`, `readme_length`: pypi_malregistry packages
+>   were removed from PyPI before collection so they had empty descriptions; the v1
+>   model learned "no description ⇒ malicious" and could be evaded by simply padding
+>   the description field.
+> - **Round 2** — `has_repo_link`, `version_count`: top-PyPI benigns nearly always
+>   have a GitHub URL and many releases (92.5% / avg 88); pypi_malregistry packages
+>   never do (0% / always 1). 100% separable but trivially evadable — an attacker
+>   can claim a fake repo URL in `setup.py` and our adversarial test confirmed this
+>   evaded 500/500 sampled malicious packages.
 
 ---
 
@@ -200,7 +212,7 @@ PyPI / npm APIs
       ↓  every 15 min   [Airflow: ingest_dag]
 MinIO (raw archives) + Postgres (packages table)
       ↓  every 30 min   [Airflow: extract_dag]
-17 features extracted → Postgres (features table)
+13 features extracted → Postgres (features table)
       ↓  weekly         [Airflow: train_dag]
 XGBoost → MLflow experiment tracking → champion model
       ↓  every 30 min   [Airflow: score_dag]
