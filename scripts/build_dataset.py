@@ -37,7 +37,24 @@ import requests
 ROOT = Path(__file__).parent.parent
 MALREG_DIR = ROOT / "data" / "pypi_malregistry"
 MALREG_REPO = "https://github.com/lxyeternal/pypi_malregistry"
+BENIGN_ARCHIVE_DIR = ROOT / "data" / "benign_archives"
 MAX_ARCHIVE_BYTES = 50 * 1024 * 1024  # 50 MB
+
+
+def _save_archive(registry: str, name: str, version: str, raw: bytes) -> str | None:
+    """Persist a downloaded tarball so features can be re-extracted later.
+    Returns the relative path or None on failure."""
+    try:
+        # Filename-safe slug — npm names may contain @ and /
+        safe = name.replace("/", "__").replace("@", "AT")
+        out_dir = BENIGN_ARCHIVE_DIR / registry
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{safe}-{version}.tar.gz"
+        out_path.write_bytes(raw)
+        return str(out_path.relative_to(ROOT))
+    except Exception as exc:
+        print(f"  [archive] failed to save {registry}/{name}@{version}: {exc}")
+        return None
 
 DB = {
     "host":     os.environ.get("DB_HOST", "localhost"),
@@ -212,7 +229,11 @@ def process_tarball(tar_path: Path) -> str:
         with tempfile.TemporaryDirectory() as tmpdir:
             _unpack(data, tmpdir)
             pkg_dir = _pkg_root(tmpdir)
-            pkg_meta = {"name": name, "version": version, "registry": "pypi"}
+            pkg_meta = {
+                "name": name, "version": version, "registry": "pypi",
+                "homepage": None, "repository": None,
+                "project_urls": None, "version_count": 1,
+            }
             features = {
                 **extract_code_features(pkg_dir),
                 **extract_metadata_features(pkg_meta),
@@ -267,12 +288,12 @@ def ingest_malicious(workers: int) -> None:
 # Benign: PyPI top-500
 # ---------------------------------------------------------------------------
 
-def ingest_benign_pypi() -> None:
-    print("\n=== Benign PyPI (top-2000) ===")
+def ingest_benign_pypi(limit: int = 5000) -> None:
+    print(f"\n=== Benign PyPI (top-{limit}) ===")
     rows = requests.get(
         "https://hugovk.github.io/top-pypi-packages/top-pypi-packages-30-days.min.json",
         timeout=30,
-    ).json().get("rows", [])[:2000]
+    ).json().get("rows", [])[:limit]
 
     ok = skip = 0
     for row in rows:
@@ -301,12 +322,19 @@ def ingest_benign_pypi() -> None:
             if len(raw) > MAX_ARCHIVE_BYTES:
                 skip += 1
                 continue
+            archive_path = _save_archive("pypi", name, version, raw)
             with tempfile.TemporaryDirectory() as tmpdir:
                 _unpack(raw, tmpdir)
                 pkg_dir = _pkg_root(tmpdir)
                 pkg_meta = {
                     "name": name, "version": version,
                     "registry": "pypi", "description": info.get("summary"),
+                    "homepage": info.get("home_page"),
+                    "project_urls": info.get("project_urls") or {},
+                    "repository": (info.get("project_urls") or {}).get("Source")
+                                  or (info.get("project_urls") or {}).get("Repository")
+                                  or (info.get("project_urls") or {}).get("Homepage"),
+                    "version_count": len(data.get("releases") or {}) or 1,
                 }
                 features = {
                     **extract_code_features(pkg_dir),
@@ -316,7 +344,8 @@ def ingest_benign_pypi() -> None:
             save(
                 registry="pypi", name=name, version=version,
                 author=info.get("author"), description=info.get("summary"),
-                homepage=info.get("home_page"), repository=None,
+                homepage=info.get("home_page"),
+                repository=pkg_meta.get("repository"),
                 keywords=[], downloads=min(row.get("download_count", 0), 9_000_000_000),
                 label=0, label_source="top_pypi",
                 features=features,
@@ -334,10 +363,46 @@ def ingest_benign_pypi() -> None:
 # Benign: npm
 # ---------------------------------------------------------------------------
 
-def ingest_benign_npm() -> None:
-    print("\n=== Benign npm ===")
+def _fetch_top_npm(target: int = 500) -> list[str]:
+    """Pull popular npm packages from npms.io (sorted by 'popularity' score).
+
+    Falls back to the curated TOP_NPM list if the API is unreachable.
+    """
+    names: list[str] = []
+    seen = set()
+    page_size = 250  # npms.io max
+    try:
+        for offset in range(0, target, page_size):
+            resp = requests.get(
+                "https://api.npms.io/v2/search",
+                params={"q": "not:deprecated not:insecure",
+                        "size": min(page_size, target - offset),
+                        "from": offset},
+                timeout=30,
+            )
+            if resp.status_code != 200:
+                break
+            for hit in resp.json().get("results", []):
+                pkg = hit.get("package", {}).get("name")
+                if pkg and pkg not in seen:
+                    seen.add(pkg)
+                    names.append(pkg)
+            if len(names) >= target:
+                break
+    except Exception as exc:
+        print(f"  npms.io fetch failed ({exc}); falling back to curated TOP_NPM")
+    # Always union with the curated list so we never regress.
+    for n in TOP_NPM:
+        if n not in seen:
+            names.append(n)
+            seen.add(n)
+    return names[:max(target, len(TOP_NPM))]
+
+
+def ingest_benign_npm(target: int = 500) -> None:
+    print(f"\n=== Benign npm (top-{target}) ===")
     ok = skip = 0
-    for name in TOP_NPM:
+    for name in _fetch_top_npm(target):
         try:
             encoded = name.replace("/", "%2F")
             resp = requests.get(
@@ -359,12 +424,27 @@ def ingest_benign_npm() -> None:
             if len(raw) > MAX_ARCHIVE_BYTES:
                 skip += 1
                 continue
+            archive_path = _save_archive("npm", name, version, raw)
             with tempfile.TemporaryDirectory() as tmpdir:
                 _unpack(raw, tmpdir)
                 pkg_dir = _pkg_root(tmpdir)
+                repo_field = info.get("repository")
+                if isinstance(repo_field, dict):
+                    repo_url = repo_field.get("url")
+                elif isinstance(repo_field, str):
+                    repo_url = repo_field
+                else:
+                    repo_url = None
+                # npm often prefixes git+https:// — strip so _is_real_repo_url matches
+                if repo_url and repo_url.startswith("git+"):
+                    repo_url = repo_url[4:]
                 pkg_meta = {
                     "name": name, "version": version,
                     "registry": "npm", "description": info.get("description"),
+                    "homepage": info.get("homepage"),
+                    "repository": repo_url,
+                    "project_urls": None,
+                    "version_count": 1,
                 }
                 features = {
                     **extract_code_features(pkg_dir),
@@ -376,7 +456,7 @@ def ingest_benign_npm() -> None:
                 registry="npm", name=name, version=version,
                 author=author.get("name") if isinstance(author, dict) else author,
                 description=info.get("description"),
-                homepage=info.get("homepage"), repository=None,
+                homepage=info.get("homepage"), repository=repo_url,
                 keywords=(info.get("keywords") or [])[:20], downloads=0,
                 label=0, label_source="top_npm",
                 features=features,

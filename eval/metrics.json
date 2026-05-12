@@ -1,0 +1,32 @@
+{
+  "f1": 0.9013254786450663,
+  "precision": 0.9765957446808511,
+  "recall": 0.8368277119416591,
+  "roc_auc": 0.9174605424943291,
+  "n_total": 16127,
+  "n_malicious": 10968,
+  "n_benign": 5159,
+  "n_test": 3226,
+  "scale_pos_weight": 0.4704,
+  "roc_auc_plot": 0.9174605424943291,
+  "avg_precision": -0.9680663305352231,
+  "tn": 988,
+  "fp": 44,
+  "fn": 358,
+  "tp": 1836,
+  "shap_importance": {
+    "entropy_max": 0.440164178609848,
+    "has_network_in_install": 0.33361077308654785,
+    "has_credential_access": 0.0,
+    "has_obfuscated_code": 1.135451316833496,
+    "has_exec_eval": 0.10399273037910461,
+    "install_script_lines": 0.0008384398533962667,
+    "dangerous_import_count": 1.1184804439544678,
+    "has_os_targeting": 0.0,
+    "has_external_payload": 0.020485462620854378,
+    "api_category_count": 1.139040231704712,
+    "typosquat_distance": 0.08404894918203354,
+    "is_typosquat": 0.03083561547100544,
+    "version_jump_suspicious": 0.30221909284591675
+  }
+}

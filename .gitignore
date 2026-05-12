@@ -8,8 +8,8 @@ __pycache__/
 # Virtual environment
 .venv/
 
-# Data — too large for git (1.2 GB)
-data/pypi_malregistry/
+# Data — too large for git (5+ GB across pypi_malregistry/, benign_archives/, backup/)
+data/
 
 # Airflow logs
 logs/
@@ -19,6 +19,12 @@ notebooks/.ipynb_checkpoints/
 
 # Environment — contains credentials
 .env
+
+# Presentation source (large binary, owned by author)
+*.pptx
+
+# Claude scheduled-tasks marker
+.claude/scheduled_tasks.lock
 
 # OS
 .DS_Store

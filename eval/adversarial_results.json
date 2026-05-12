@@ -1,0 +1,105 @@
+{
+  "threshold": 0.3,
+  "attack_a_text": {
+    "perturbations": [
+      [
+        "description_length",
+        120
+      ],
+      [
+        "readme_length",
+        2000
+      ]
+    ],
+    "v1_baseline": {
+      "flagged": 500,
+      "evaded": 499,
+      "rate": 0.998,
+      "by_pert": {
+        "description_length": 499,
+        "readme_length": 0
+      }
+    },
+    "v7_robust": {
+      "flagged": 441,
+      "evaded": 0,
+      "rate": 0.0,
+      "by_pert": {
+        "description_length": 0,
+        "readme_length": 0
+      }
+    },
+    "reduction_pct": 100.0
+  },
+  "attack_b_metadata": {
+    "perturbations": [
+      [
+        "has_repo_link",
+        1
+      ],
+      [
+        "version_count",
+        8
+      ],
+      [
+        "is_typosquat",
+        0
+      ],
+      [
+        "typosquat_distance",
+        5
+      ]
+    ],
+    "v1_baseline": {
+      "flagged": 500,
+      "evaded": 0,
+      "rate": 0.0,
+      "by_pert": {
+        "has_repo_link": 0,
+        "version_count": 0,
+        "is_typosquat": 0,
+        "typosquat_distance": 0
+      }
+    },
+    "v7_robust": {
+      "flagged": 441,
+      "evaded": 1,
+      "rate": 0.0022675736961451248,
+      "by_pert": {
+        "has_repo_link": 0,
+        "version_count": 0,
+        "is_typosquat": 0,
+        "typosquat_distance": 1
+      }
+    },
+    "reduction_pct": -226757269.6
+  },
+  "combined": {
+    "v1_baseline": {
+      "flagged": 500,
+      "evaded": 499,
+      "rate": 0.998,
+      "by_pert": {
+        "description_length": 499,
+        "readme_length": 0,
+        "has_repo_link": 0,
+        "version_count": 0,
+        "is_typosquat": 0,
+        "typosquat_distance": 0
+      }
+    },
+    "v7_robust": {
+      "flagged": 441,
+      "evaded": 1,
+      "rate": 0.0022675736961451248,
+      "by_pert": {
+        "description_length": 0,
+        "readme_length": 0,
+        "has_repo_link": 0,
+        "version_count": 0,
+        "is_typosquat": 0,
+        "typosquat_distance": 1
+      }
+    }
+  }
+}

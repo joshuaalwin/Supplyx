@@ -30,8 +30,7 @@ FEATURES = [
     "has_obfuscated_code", "has_exec_eval", "install_script_lines",
     "dangerous_import_count", "has_os_targeting", "has_external_payload",
     "api_category_count", "typosquat_distance", "is_typosquat",
-    "has_repo_link", "version_count", "version_jump_suspicious",
-    "description_length", "readme_length",
+    "version_jump_suspicious",
 ]
 
 DB = {
@@ -176,11 +175,7 @@ def score_package(req: ScoreRequest):
                     COALESCE(f.api_category_count, 0)                       AS api_category_count,
                     COALESCE(f.typosquat_distance, 0)                       AS typosquat_distance,
                     CASE WHEN f.typosquat_target IS NOT NULL THEN 1 ELSE 0 END AS is_typosquat,
-                    COALESCE(f.has_repo_link::int, 0)                       AS has_repo_link,
-                    COALESCE(f.version_count, 1)                            AS version_count,
-                    COALESCE(f.version_jump_suspicious::int, 0)             AS version_jump_suspicious,
-                    COALESCE(f.description_length, 0)                       AS description_length,
-                    COALESCE(f.readme_length, 0)                            AS readme_length
+                    COALESCE(f.version_jump_suspicious::int, 0)             AS version_jump_suspicious
                 FROM packages p
                 JOIN features f ON f.package_id = p.id
                 WHERE p.registry=%s AND p.name=%s AND p.version=%s

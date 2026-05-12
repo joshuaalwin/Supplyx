@@ -31,9 +31,17 @@ FEATURES = [
     "has_obfuscated_code", "has_exec_eval", "install_script_lines",
     "dangerous_import_count", "has_os_targeting", "has_external_payload",
     "api_category_count", "typosquat_distance", "is_typosquat",
-    "has_repo_link", "version_count", "version_jump_suspicious",
-    "description_length", "readme_length",
+    "version_jump_suspicious",
 ]
+
+# Monotonic constraints, aligned with FEATURES order. See scripts/train_model.py
+# for rationale + which features were dropped as collection artifacts.
+MONOTONE_CONSTRAINTS = (
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    0,
+    1,
+    1,
+)
 
 default_args = {"owner": "mlpro", "retries": 1, "retry_delay": timedelta(minutes=10)}
 
@@ -54,11 +62,7 @@ def load_training_data() -> tuple[pd.DataFrame, pd.Series]:
             COALESCE(f.api_category_count, 0)                       AS api_category_count,
             COALESCE(f.typosquat_distance, 0)                       AS typosquat_distance,
             CASE WHEN f.typosquat_target IS NOT NULL THEN 1 ELSE 0 END AS is_typosquat,
-            COALESCE(f.has_repo_link::int, 0)                       AS has_repo_link,
-            COALESCE(f.version_count, 1)                            AS version_count,
-            COALESCE(f.version_jump_suspicious::int, 0)             AS version_jump_suspicious,
-            COALESCE(f.description_length, 0)                       AS description_length,
-            COALESCE(f.readme_length, 0)                            AS readme_length
+            COALESCE(f.version_jump_suspicious::int, 0)             AS version_jump_suspicious
         FROM packages p
         JOIN features f ON f.package_id = p.id
         WHERE p.label IS NOT NULL
@@ -90,13 +94,14 @@ def train(**_) -> None:
     scale_pos_weight = n_ben / max(n_mal, 1)
 
     model = XGBClassifier(
-        n_estimators=300,
+        n_estimators=400,
         max_depth=6,
         learning_rate=0.05,
         subsample=0.8,
         colsample_bytree=0.8,
         scale_pos_weight=scale_pos_weight,
         eval_metric="logloss",
+        monotone_constraints=MONOTONE_CONSTRAINTS,
         random_state=42,
         n_jobs=-1,
     )
@@ -123,10 +128,12 @@ def train(**_) -> None:
         }
         mlflow.log_metrics(metrics)
         mlflow.log_params({
-            "n_estimators": 300,
-            "max_depth": 6,
-            "learning_rate": 0.05,
-            "scale_pos_weight": round(scale_pos_weight, 2),
+            "n_estimators":         400,
+            "max_depth":            6,
+            "learning_rate":        0.05,
+            "scale_pos_weight":     round(scale_pos_weight, 4),
+            "monotone_constraints": str(MONOTONE_CONSTRAINTS),
+            "n_features":           len(FEATURES),
         })
 
         print(f"[train] metrics: {metrics}")

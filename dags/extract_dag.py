@@ -80,6 +80,10 @@ def extract_features_batch(**_) -> None:
                     "version": version,
                     "registry": registry,
                     "description": pkg.get("description"),
+                    "homepage": pkg.get("homepage"),
+                    "repository": pkg.get("repository"),
+                    "project_urls": None,
+                    "version_count": 1,
                 }
 
                 code_f = extract_code_features(pkg_dir)
