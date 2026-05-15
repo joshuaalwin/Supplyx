@@ -5,7 +5,7 @@ MLPro catches malicious packages on PyPI and npm before they reach downstream us
 The whole thing runs in Docker Compose: ingestion, feature extraction, training, scoring, and a REST API that hands back risk assessments with readable security reports. A pre-trained model ships in the repo. You can start scoring packages without training anything.
 
 <p align="center">
-  <img src="https://github.com/joshuaalwin/Supplyx/releases/download/screenshots/system-architecture.png" alt="MLPro System Architecture" width="900"/>
+  <img src="https://github.com/joshuaalwin/Supplyx/releases/download/screenshots/ML-ArchiDiagram-Light.png" alt="Supplyx System Architecture" width="900"/>
 </p>
 
 ---
